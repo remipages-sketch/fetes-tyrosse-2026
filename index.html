@@ -9,9 +9,8 @@
 
     /* Taille de police racine fluide : tout le texte (en rem) grandit
        avec la largeur de l'écran. Plus gros sur grand téléphone (Pixel…). */
-    /*html { font-size: clamp(22px, 5.8vw, 27px); }*/
     html { font-size: clamp(18px, 4.6vw, 21px); }
-    
+
     :root {
       --red:    #c0392b;
       --red-dk: #96281b;
@@ -238,6 +237,38 @@
       .main { padding: 10px 10px 40px; }
       .grid { grid-template-columns: 1fr; }
     }
+
+    /* ── Écran de code d'accès ── */
+    .gate {
+      position: fixed; inset: 0; z-index: 1000;
+      background: linear-gradient(135deg, #c0392b 0%, #96281b 100%);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .gate[hidden] { display: none; }
+    .gate-box {
+      background: #fff; border-radius: 16px;
+      padding: 26px 22px; width: 100%; max-width: 360px;
+      box-shadow: 0 10px 40px rgba(0,0,0,.3); text-align: center;
+    }
+    .gate-title { font-size: 1.25rem; font-weight: 700; color: var(--text); }
+    .gate-sub { font-size: .92rem; color: var(--muted); margin: 8px 0 18px; }
+    .gate-input {
+      width: 100%; padding: 12px 14px;
+      border: 1.5px solid var(--border); border-radius: 10px;
+      font-size: 1.05rem; font-family: inherit; outline: none;
+      text-align: center;
+    }
+    .gate-input:focus { border-color: var(--red); }
+    .gate-btn {
+      width: 100%; margin-top: 12px; padding: 12px;
+      border: none; border-radius: 10px; cursor: pointer;
+      background: var(--red); color: #fff;
+      font-size: 1.02rem; font-weight: 700; font-family: inherit;
+    }
+    .gate-btn:active { transform: scale(.98); }
+    .gate-err { color: var(--red); font-size: .9rem; margin-top: 12px; }
+    .gate-err[hidden] { display: none; }
   </style>
 </head>
 <body>
@@ -280,13 +311,30 @@
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
+<!-- Écran de code d'accès (affiché seulement si le serveur exige un code) -->
+<div class="gate" id="gate" hidden>
+  <div class="gate-box">
+    <div class="gate-title">🔒 Accès réservé</div>
+    <p class="gate-sub">Entrez le code transmis par l'organisation des Fêtes.</p>
+    <input id="gateInput" class="gate-input" type="text"
+           inputmode="text" autocomplete="off" autocapitalize="none"
+           placeholder="Code d'accès" />
+    <button id="gateBtn" class="gate-btn" type="button">Valider</button>
+    <p id="gateErr" class="gate-err" hidden>Code incorrect, réessayez.</p>
+  </div>
+</div>
+
 <script>
 // ── Configuration ──────────────────────────────────────────
 // Colle ci-dessous l'URL de TON application web Google (se termine par /exec).
 // Laisse vide ('') pour utiliser les données de démonstration (aperçu local).
-var API_URL = 'https://script.google.com/macros/s/AKfycbx2oeT3j-iD6uzR9cM5vyRGSYm6s8t5AS-CrVtofvk1fy0iDdY3GOWqfft3qluAjB0dSw/exec';
+var API_URL = 'https://script.google.com/macros/s/AKfycbx7dTQhtt50jvcdEwUOiIRGvwFfty9Wqfo1HI53Wfn02ousVoSZmwkQQDdXGdiORivS-w/exec';
 
-  
+// Code d'accès partagé (saisi par l'utilisateur, mémorisé sur l'appareil).
+// Envoyé à chaque appel API ; le serveur le vérifie. Vide = aucun code.
+var ACCESS_CODE = '';
+try { ACCESS_CODE = localStorage.getItem('fdt_code') || ''; } catch (e) {}
+
 // Données de démonstration (utilisées uniquement si API_URL est vide).
 var MOCK_DATA = {
     jours: [
@@ -409,6 +457,7 @@ function callApi(action, params) {
     Object.keys(params).forEach(function (k) {
       qs += '&' + k + '=' + encodeURIComponent(params[k]);
     });
+    if (ACCESS_CODE) qs += '&code=' + encodeURIComponent(ACCESS_CODE);
     script.src = API_URL + qs;
     script.onerror = function () { cleanup(); reject(new Error('network')); };
     document.head.appendChild(script);
@@ -459,6 +508,11 @@ function mockApi(action, params) {
 
     document.getElementById('btnRefresh').addEventListener('click', doRafraichir);
 
+    document.getElementById('gateBtn').addEventListener('click', validerCode);
+    document.getElementById('gateInput').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') validerCode();
+    });
+
     loadData();
     setInterval(loadData, REFRESH_MS);
   });
@@ -473,6 +527,7 @@ function mockApi(action, params) {
       .then(function (data) {
         btn.disabled = false;
         btn.classList.remove('spinning');
+        if (estRefuse(data)) { demanderCode(true); return; }
         onData(data);
         toast('Créneaux à jour', 'ok');
       })
@@ -488,9 +543,35 @@ function mockApi(action, params) {
       document.getElementById('hdr').offsetHeight + 'px';
   }
 
+  // ── Code d'accès ──────────────────────────────────────────
+  // Le serveur renvoie { error:'unauthorized' } si le code manque/est faux.
+  function estRefuse(data) { return data && data.error === 'unauthorized'; }
+
+  function demanderCode(faux) {
+    var g = document.getElementById('gate');
+    g.hidden = false;
+    document.getElementById('gateErr').hidden = !faux;
+    var inp = document.getElementById('gateInput');
+    if (faux) inp.value = '';
+    inp.focus();
+  }
+
+  function validerCode() {
+    var v = document.getElementById('gateInput').value.trim();
+    if (!v) return;
+    ACCESS_CODE = v;                       // variable globale lue par callApi
+    try { localStorage.setItem('fdt_code', v); } catch (e) {}
+    document.getElementById('gate').hidden = true;
+    state.data = null;                     // force un vrai premier chargement
+    loadData();
+  }
+
   // ── Data loading ──────────────────────────────────────────
   function loadData() {
-    callApi('getData').then(onData).catch(onError);
+    callApi('getData').then(function (data) {
+      if (estRefuse(data)) { demanderCode(!!ACCESS_CODE); return; }
+      onData(data);
+    }).catch(onError);
   }
 
   function onData(data) {
@@ -664,6 +745,7 @@ function mockApi(action, params) {
     callApi('inscrire', { nom: nom, creneauId: creneauId })
       .then(function (res) {
         setBusy(false);
+        if (estRefuse(res)) { demanderCode(true); return; }
         if (res && res.success) {
           state.data.inscriptions.push({ nom: nom, creneauId: creneauId });
           renderDay();
@@ -685,6 +767,7 @@ function mockApi(action, params) {
     callApi('desinscrire', { nom: nom, creneauId: creneauId })
       .then(function (res) {
         setBusy(false);
+        if (estRefuse(res)) { demanderCode(true); return; }
         if (res && res.success) {
           var nomLc = nom.toLowerCase();
           state.data.inscriptions = state.data.inscriptions.filter(function (ins) {

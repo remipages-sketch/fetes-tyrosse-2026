@@ -488,9 +488,10 @@ function mockApi(action, params) {
   'use strict';
 
   // ── State ──────────────────────────────────────────────────
-  var state = { data: null, dayId: null, busy: false };
+  var state = { data: null, dayId: null };
   var NOM_KEY = 'fdt_benevole_nom';
   var REFRESH_MS = 60000;
+  var pending = 0; // nb d'écritures en cours (inscrire/désinscrire optimistes)
 
   // ── Boot ──────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function () {
@@ -569,6 +570,7 @@ function mockApi(action, params) {
   function loadData() {
     callApi('getData').then(function (data) {
       if (estRefuse(data)) { demanderCode(!!ACCESS_CODE); return; }
+      if (pending > 0) return; // une écriture optimiste est en cours : ne pas écraser
       onData(data);
     }).catch(onError);
   }
@@ -724,7 +726,7 @@ function mockApi(action, params) {
   // ── Event delegation ──────────────────────────────────────
   document.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-action]');
-    if (!btn || btn.disabled || state.busy) return;
+    if (!btn || btn.disabled) return;
 
     var action = btn.dataset.action;
     var id     = btn.dataset.id;
@@ -733,7 +735,15 @@ function mockApi(action, params) {
     if (action === 'leave') doDesinscrire(id);
   });
 
-  // ── Actions ───────────────────────────────────────────────
+  // Vrai si « nom » est déjà inscrit sur ce créneau (dans l'état local).
+  function estInscrit(creneauId, nomLc) {
+    return state.data.inscriptions.some(function (ins) {
+      return ins.creneauId === creneauId && ins.nom.toLowerCase() === nomLc;
+    });
+  }
+
+  // ── Actions (optimistes : l'écran réagit tout de suite, l'envoi se ──
+  //    fait en arrière-plan ; on annule seulement en cas d'échec) ──────
   function doInscrire(creneauId) {
     var nom = document.getElementById('nom').value.trim();
     if (!nom) {
@@ -741,55 +751,78 @@ function mockApi(action, params) {
       document.getElementById('nom').focus();
       return;
     }
-    setBusy(true);
+    if (estInscrit(creneauId, nom.toLowerCase())) return; // déjà inscrit
+
+    // 1) Mise à jour immédiate de l'affichage
+    var entree = { nom: nom, creneauId: creneauId };
+    state.data.inscriptions.push(entree);
+    renderDay();
+
+    // 2) Envoi au serveur en arrière-plan
+    pending++;
     callApi('inscrire', { nom: nom, creneauId: creneauId })
       .then(function (res) {
-        setBusy(false);
-        if (estRefuse(res)) { demanderCode(true); return; }
-        if (res && res.success) {
-          state.data.inscriptions.push({ nom: nom, creneauId: creneauId });
-          renderDay();
-          toast('Inscription enregistrée !', 'ok');
-        } else {
-          toast((res && res.error) || 'Erreur lors de l\'inscription', 'err');
+        pending--;
+        if (estRefuse(res)) { retirer(entree); renderDay(); demanderCode(true); return; }
+        if (!res || !res.success) {
+          // « Déjà inscrit » côté serveur n'est pas une vraie erreur : on garde.
+          if (!(res && /déjà/i.test(res.error || ''))) {
+            retirer(entree); renderDay();
+            toast((res && res.error) || 'Inscription non enregistrée', 'err');
+          }
         }
       })
       .catch(function () {
-        setBusy(false);
-        toast('Erreur de connexion', 'err');
+        pending--;
+        retirer(entree); renderDay();
+        toast('Hors ligne : inscription non enregistrée', 'err');
       });
   }
 
   function doDesinscrire(creneauId) {
     var nom = document.getElementById('nom').value.trim();
     if (!nom) return;
-    setBusy(true);
+    var nomLc = nom.toLowerCase();
+    if (!estInscrit(creneauId, nomLc)) return;
+
+    // 1) Retrait immédiat de l'affichage (on mémorise pour pouvoir annuler)
+    var sauvegarde = state.data.inscriptions.slice();
+    state.data.inscriptions = state.data.inscriptions.filter(function (ins) {
+      return !(ins.nom.toLowerCase() === nomLc && ins.creneauId === creneauId);
+    });
+    renderDay();
+
+    // 2) Envoi au serveur en arrière-plan
+    pending++;
     callApi('desinscrire', { nom: nom, creneauId: creneauId })
       .then(function (res) {
-        setBusy(false);
-        if (estRefuse(res)) { demanderCode(true); return; }
-        if (res && res.success) {
-          var nomLc = nom.toLowerCase();
-          state.data.inscriptions = state.data.inscriptions.filter(function (ins) {
-            return !(ins.nom.toLowerCase() === nomLc && ins.creneauId === creneauId);
-          });
-          renderDay();
-          toast('Désinscription enregistrée', 'ok');
-        } else {
-          toast((res && res.error) || 'Erreur lors de la désinscription', 'err');
+        pending--;
+        if (estRefuse(res)) { state.data.inscriptions = sauvegarde; renderDay(); demanderCode(true); return; }
+        if (!res || !res.success) {
+          if (!(res && /trouv/i.test(res.error || ''))) {
+            state.data.inscriptions = sauvegarde; renderDay();
+            toast((res && res.error) || 'Désinscription non enregistrée', 'err');
+          }
         }
       })
       .catch(function () {
-        setBusy(false);
-        toast('Erreur de connexion', 'err');
+        pending--;
+        state.data.inscriptions = sauvegarde; renderDay();
+        toast('Hors ligne : désinscription non enregistrée', 'err');
       });
   }
 
-  function setBusy(b) {
-    state.busy = b;
-    document.querySelectorAll('.btn').forEach(function (el) {
-      if (!el.hasAttribute('title')) el.disabled = b;
-    });
+  // Retire une entrée précise des inscriptions locales (par référence/valeur).
+  function retirer(entree) {
+    var i = state.data.inscriptions.indexOf(entree);
+    if (i >= 0) { state.data.inscriptions.splice(i, 1); return; }
+    var nomLc = entree.nom.toLowerCase();
+    for (var j = state.data.inscriptions.length - 1; j >= 0; j--) {
+      var ins = state.data.inscriptions[j];
+      if (ins.creneauId === entree.creneauId && ins.nom.toLowerCase() === nomLc) {
+        state.data.inscriptions.splice(j, 1); return;
+      }
+    }
   }
 
   // ── Toast ─────────────────────────────────────────────────

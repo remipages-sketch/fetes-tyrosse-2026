@@ -34,15 +34,15 @@
     .hdr {
       background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);
       color: #fff;
-      padding: 14px 16px 12px;
+      padding: 9px 14px 8px;
       position: sticky;
       top: 0;
       z-index: 200;
       box-shadow: 0 2px 8px rgba(0,0,0,.25);
     }
     .hdr-top { display: flex; align-items: center; gap: 10px; }
-    .hdr-logo { font-size: 1.5rem; line-height: 1; }
-    .hdr-titles h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: -.2px; }
+    .hdr-logo { font-size: 1.2rem; line-height: 1; }
+    .hdr-titles h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: -.2px; }
 
     .btn-refresh {
       margin-left: auto;
@@ -67,7 +67,7 @@
 
     .nom-row {
       display: flex; align-items: center; gap: 8px;
-      margin-top: 10px;
+      margin-top: 7px;
     }
     .nom-row label { font-size: .95rem; white-space: nowrap; opacity: .9; }
     .nom-input {
@@ -95,13 +95,13 @@
     .tabs-wrap::-webkit-scrollbar { display: none; }
     .tabs { display: flex; min-width: max-content; }
     .tab {
-      padding: 11px 15px;
+      padding: 10px 16px;
       color: rgba(255,255,255,.78);
       background: transparent;
       border: none;
       border-bottom: 3px solid transparent;
       font-family: inherit;
-      font-size: .92rem; font-weight: 500;
+      font-size: 1.12rem; font-weight: 600;
       cursor: pointer;
       white-space: nowrap;
       transition: color .15s, border-color .15s, background .15s;
@@ -279,7 +279,6 @@
     <span class="hdr-logo">🎉</span>
     <div class="hdr-titles">
       <h1>Fêtes de Tyrosse 2026</h1>
-      <p>Disponibilités bénévoles · 29 juil – 3 août</p>
     </div>
     <button id="btnRefresh" class="btn-refresh" type="button"
             title="Mettre à jour la liste des inscriptions">
@@ -292,7 +291,7 @@
            placeholder="ex : Marie D." autocomplete="given-name"
            maxlength="100" />
   </div>
-  <p class="nom-hint">Prénom + initiale du nom (ex : Marie D.) — visible par tous, mémorisé sur cet appareil</p>
+  <p class="nom-hint">Prénom + initiale (ex : Marie D.) — visible par tous</p>
 </header>
 
 <!-- Tabs -->
@@ -601,7 +600,8 @@ function mockApi(action, params) {
     state.data.jours.forEach(function (j) {
       var t = document.createElement('button');
       t.className = 'tab';
-      t.textContent = j.label.split(' ').slice(0, 2).join(' '); // "Mercredi 29"
+      var lbl = j.label.split(' ');
+      t.textContent = lbl[0].slice(0, 3) + '. ' + lbl[1]; // "Mer. 29"
       t.setAttribute('data-id', j.id);
       t.addEventListener('click', function () {
         state.dayId = j.id;

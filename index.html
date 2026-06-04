@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sondage Bénévoles — Fêtes de Tyrosse 2026</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* Taille de police racine fluide : tout le texte (en rem) grandit
+       avec la largeur de l'écran. Plus gros sur grand téléphone (Pixel…). */
+    html { font-size: clamp(22px, 5.8vw, 27px); }
+
+    :root {
+      --red:    #c0392b;
+      --red-dk: #96281b;
+      --orange: #e67e22;
+      --green:  #27ae60;
+      --bg:     #f2f3f5;
+      --white:  #ffffff;
+      --text:   #2c3e50;
+      --muted:  #7f8c8d;
+      --border: #e0e0e0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .hdr {
+      background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);
+      color: #fff;
+      padding: 14px 16px 12px;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    .hdr-top { display: flex; align-items: center; gap: 10px; }
+    .hdr-logo { font-size: 1.5rem; line-height: 1; }
+    .hdr-titles h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: -.2px; }
+
+    .btn-refresh {
+      margin-left: auto;
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255,255,255,.93); color: var(--red-dk);
+      border: none; border-radius: 20px;
+      padding: 7px 13px;
+      font-family: inherit; font-size: .86rem; font-weight: 700;
+      cursor: pointer; white-space: nowrap;
+      transition: background .15s, transform .1s;
+    }
+    .btn-refresh:hover:not(:disabled) { background: #fff; }
+    .btn-refresh:active:not(:disabled) { transform: scale(.96); }
+    .btn-refresh:disabled { opacity: .6; cursor: default; }
+    .btn-refresh .ico { display: inline-block; font-size: .95rem; }
+    .btn-refresh.spinning .ico { animation: rot .8s linear infinite; }
+    @media (max-width: 480px) {
+      .btn-refresh .lbl { display: none; }
+      .btn-refresh { padding: 8px; border-radius: 50%; }
+    }
+    .hdr-titles p  { font-size: .88rem; opacity: .85; margin-top: 2px; }
+
+    .nom-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 10px;
+    }
+    .nom-row label { font-size: .95rem; white-space: nowrap; opacity: .9; }
+    .nom-input {
+      flex: 1; padding: 9px 14px;
+      border: none; border-radius: 20px;
+      font-size: 1rem; outline: none;
+      background: rgba(255,255,255,.93);
+      color: var(--text);
+      min-width: 0;
+    }
+    .nom-input::placeholder { color: #aaa; }
+    .nom-hint {
+      font-size: .82rem; opacity: .75; margin-top: 5px; padding-left: 2px;
+    }
+
+    /* ── Tabs ── */
+    .tabs-wrap {
+      background: var(--red-dk);
+      position: sticky;
+      z-index: 190;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .tabs-wrap::-webkit-scrollbar { display: none; }
+    .tabs { display: flex; min-width: max-content; }
+    .tab {
+      padding: 11px 15px;
+      color: rgba(255,255,255,.78);
+      background: transparent;
+      border: none;
+      border-bottom: 3px solid transparent;
+      font-family: inherit;
+      font-size: .92rem; font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color .15s, border-color .15s, background .15s;
+      user-select: none;
+    }
+    .tab:hover { color: #fff; background: rgba(255,255,255,.12); }
+    .tab.active { color: #fff; font-weight: 700; border-bottom-color: #f39c12; }
+
+    /* ── Main ── */
+    .main {
+      padding: 14px 14px 40px;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    .day-hdr { margin-bottom: 14px; }
+    .day-title { font-size: 1.3rem; font-weight: 700; }
+    .day-sub   { font-size: .9rem; color: var(--muted); margin-top: 3px; }
+
+    /* ── Time block (groups slots sharing the same horaire) ── */
+    .timeblock { margin-bottom: 16px; }
+    .timeblock-head {
+      display: inline-block;
+      font-size: .98rem; font-weight: 700;
+      color: var(--red-dk);
+      background: #fdecea;
+      padding: 5px 13px; border-radius: 8px;
+      margin-bottom: 9px;
+    }
+    .timeblock-row {
+      display: flex; flex-wrap: wrap; gap: 10px;
+    }
+    .timeblock-row .card { flex: 1 1 220px; max-width: 100%; }
+
+    /* ── Slot card ── */
+    .card {
+      background: var(--white);
+      border-radius: 12px;
+      padding: 13px;
+      border: 1.5px solid var(--border);
+      transition: box-shadow .2s, border-color .2s;
+    }
+    .card:hover { box-shadow: 0 3px 12px rgba(0,0,0,.1); }
+    .card.full  { border-color: #b2dfdb; background: #f5fffc; }
+    .card.mine  { border-color: var(--red); border-width: 2px; }
+
+    .card-top {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; gap: 8px;
+      margin-bottom: 9px;
+    }
+    .card-name  { font-size: 1.08rem; font-weight: 600; flex: 1; }
+
+    /* Progress */
+    .prog { margin-bottom: 9px; }
+    .prog-bar-bg {
+      height: 5px; background: #e9ecef; border-radius: 3px;
+      overflow: hidden; margin-bottom: 4px;
+    }
+    .prog-bar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+    .prog-text { font-size: .88rem; color: var(--muted); }
+    .prog-text strong { color: var(--text); font-weight: 600; }
+
+    /* Volunteer chips */
+    .chips { min-height: 24px; margin-bottom: 10px; }
+    .chip {
+      display: inline-block;
+      background: #eef2fc; color: #1a3a6c;
+      padding: 4px 11px; border-radius: 13px;
+      font-size: .92rem; margin: 3px 3px 3px 0;
+    }
+    .chip.mine {
+      background: #fde8e6; color: var(--red-dk);
+      font-weight: 700;
+    }
+    .no-one { font-size: .9rem; color: var(--muted); font-style: italic; }
+
+    /* Buttons */
+    .btn {
+      width: 100%; padding: 11px;
+      border: none; border-radius: 8px;
+      font-size: .98rem; font-weight: 600;
+      cursor: pointer; transition: background .15s, transform .1s;
+    }
+    .btn:active:not(:disabled) { transform: scale(.97); }
+
+    .btn-join {
+      background: var(--red); color: #fff;
+    }
+    .btn-join:hover:not(:disabled) { background: var(--red-dk); }
+    .btn-join:disabled {
+      background: #bdc3c7; color: #fff; cursor: not-allowed;
+    }
+
+    .btn-leave {
+      background: #fadbd8; color: var(--red-dk);
+    }
+    .btn-leave:hover { background: #f1948a; color: #fff; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 22px; left: 50%;
+      transform: translateX(-50%) translateY(60px);
+      padding: 10px 20px; border-radius: 24px;
+      font-size: .84rem; color: #fff;
+      background: #2c3e50;
+      opacity: 0; transition: opacity .25s, transform .25s;
+      z-index: 999; white-space: nowrap; pointer-events: none;
+    }
+    .toast.ok  { background: var(--green); }
+    .toast.err { background: var(--red); }
+    .toast.on  { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Spinner ── */
+    .loader {
+      text-align: center; padding: 56px 16px; color: var(--muted);
+    }
+    .spin {
+      width: 34px; height: 34px;
+      border: 3px solid #ddd; border-top-color: var(--red);
+      border-radius: 50%; animation: rot .75s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes rot { to { transform: rotate(360deg); } }
+
+    /* ── Refresh badge ── */
+    .refresh-bar {
+      text-align: center; font-size: .8rem; color: var(--muted);
+      padding: 8px 0 0;
+    }
+
+    @media (max-width: 480px) {
+      .main { padding: 10px 10px 40px; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="hdr" id="hdr">
+  <div class="hdr-top">
+    <span class="hdr-logo">🎉</span>
+    <div class="hdr-titles">
+      <h1>Fêtes de Tyrosse 2026</h1>
+      <p>Disponibilités bénévoles · 29 juil – 3 août</p>
+    </div>
+    <button id="btnRefresh" class="btn-refresh" type="button"
+            title="Mettre à jour la liste des inscriptions">
+      <span class="ico">↻</span><span class="lbl">Rafraîchir créneaux</span>
+    </button>
+  </div>
+  <div class="nom-row">
+    <label for="nom">Mon prénom :</label>
+    <input id="nom" class="nom-input" type="text"
+           placeholder="ex: Marie Dupont" autocomplete="name"
+           maxlength="100" />
+  </div>
+  <p class="nom-hint">Votre prénom est mémorisé sur cet appareil</p>
+</header>
+
+<!-- Tabs -->
+<div class="tabs-wrap" id="tabsWrap">
+  <div class="tabs" id="tabs"></div>
+</div>
+
+<!-- Content -->
+<main class="main" id="main">
+  <div class="loader">
+    <div class="spin"></div>
+    Chargement des créneaux…
+  </div>
+</main>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Configuration ──────────────────────────────────────────
+// Colle ci-dessous l'URL de TON application web Google (se termine par /exec).
+// Laisse vide ('') pour utiliser les données de démonstration (aperçu local).
+var API_URL = 'https://script.google.com/macros/s/AKfycbwQwVLe1GLW_Ic3B86cKCNAFioN6m4Y0uSow2s9mwA_bd-tL7vNhgy6FIXXs3sFU7ewPw/exec';
+
+// Données de démonstration (utilisées uniquement si API_URL est vide).
+var MOCK_DATA = {
+    jours: [
+      { id: 'mer', label: 'Mercredi 29 juillet', sublabel: 'Montage', creneaux: [
+        { id: 'mer_1', label: 'Montage Bodega', horaire: '9h – 12h',  besoin: 10 },
+        { id: 'mer_2', label: 'Montage Bodega', horaire: '14h – 19h', besoin: 10 },
+      ]},
+      { id: 'jeu', label: 'Jeudi 30 juillet', creneaux: [
+        { id: 'jeu_1',  label: 'Journée Enfant',           horaire: '9h – 12h',    besoin: 12 },
+        { id: 'jeu_2',  label: 'Journée Enfant',           horaire: '13h – 17h',   besoin: 12 },
+        { id: 'jeu_3',  label: 'Vente t-shirts',           horaire: '10h – 16h',   besoin:  3 },
+        { id: 'jeu_4',  label: 'Course',                   horaire: '16h45 – 18h', besoin:  8 },
+        { id: 'jeu_5',  label: 'Préparation restauration', horaire: '17h30 – 19h', besoin:  2 },
+        { id: 'jeu_6',  label: 'Bodega',                   horaire: '17h30 – 20h', besoin:  6 },
+        { id: 'jeu_7',  label: 'Caisse',                   horaire: '17h30 – 20h', besoin:  1 },
+        { id: 'jeu_8',  label: 'Réassort',                 horaire: '17h30 – 20h', besoin:  1 },
+        { id: 'jeu_9',  label: 'Bodega',                   horaire: '20h – 22h',   besoin:  6 },
+        { id: 'jeu_10', label: 'Caisse',                   horaire: '20h – 22h',   besoin:  1 },
+        { id: 'jeu_11', label: 'Réassort',                 horaire: '20h – 22h',   besoin:  1 },
+        { id: 'jeu_12', label: 'Bodega',                   horaire: '22h – 00h',   besoin:  8 },
+        { id: 'jeu_13', label: 'Caisse',                   horaire: '22h – 00h',   besoin:  1 },
+        { id: 'jeu_14', label: 'Réassort',                 horaire: '22h – 00h',   besoin:  1 },
+        { id: 'jeu_15', label: 'Bodega',                   horaire: '00h – 02h',   besoin:  8 },
+        { id: 'jeu_16', label: 'Caisse',                   horaire: '00h – 02h',   besoin:  1 },
+        { id: 'jeu_17', label: 'Réassort',                 horaire: '00h – 02h',   besoin:  1 },
+        { id: 'jeu_18', label: 'Bodega',                   horaire: '02h – 03h30', besoin:  5 },
+        { id: 'jeu_19', label: 'Caisse',                   horaire: '02h – 03h30', besoin:  1 },
+        { id: 'jeu_21', label: 'Réassort',                 horaire: '02h – 03h30', besoin:  1 },
+        { id: 'jeu_20', label: 'Point repos',              horaire: '01h30 – 05h', besoin:  5 },
+      ]},
+      { id: 'ven', label: 'Vendredi 31 juillet', creneaux: [
+        { id: 'ven_1',  label: 'Tyrosse sportive',         horaire: '14h – 17h',   besoin:  4 },
+        { id: 'ven_2',  label: 'Préparation restauration', horaire: '17h30 – 19h', besoin:  2 },
+        { id: 'ven_3',  label: 'Bodega',                   horaire: '17h30 – 20h', besoin:  6 },
+        { id: 'ven_4',  label: 'Caisse',                   horaire: '17h30 – 20h', besoin:  1 },
+        { id: 'ven_5',  label: 'Réassort',                 horaire: '17h30 – 20h', besoin:  1 },
+        { id: 'ven_6',  label: 'Bodega',                   horaire: '20h – 22h',   besoin:  6 },
+        { id: 'ven_7',  label: 'Caisse',                   horaire: '20h – 22h',   besoin:  1 },
+        { id: 'ven_8',  label: 'Réassort',                 horaire: '20h – 22h',   besoin:  1 },
+        { id: 'ven_9',  label: 'Bodega',                   horaire: '22h – 00h',   besoin:  8 },
+        { id: 'ven_10', label: 'Caisse',                   horaire: '22h – 00h',   besoin:  1 },
+        { id: 'ven_11', label: 'Réassort',                 horaire: '22h – 00h',   besoin:  1 },
+        { id: 'ven_12', label: 'Bodega',                   horaire: '00h – 02h',   besoin:  8 },
+        { id: 'ven_13', label: 'Caisse',                   horaire: '00h – 02h',   besoin:  1 },
+        { id: 'ven_14', label: 'Réassort',                 horaire: '00h – 02h',   besoin:  1 },
+        { id: 'ven_15', label: 'Bodega',                   horaire: '02h – 04h30', besoin:  6 },
+        { id: 'ven_16', label: 'Caisse',                   horaire: '02h – 04h30', besoin:  1 },
+        { id: 'ven_17', label: 'Réassort',                 horaire: '02h – 04h30', besoin:  1 },
+        { id: 'ven_18', label: 'Point repos',              horaire: '01h30 – 06h', besoin:  5 },
+      ]},
+      { id: 'sam', label: 'Samedi 1er août', creneaux: [
+        { id: 'sam_1',  label: 'Préparation restauration', horaire: '17h30 – 19h', besoin:  2 },
+        { id: 'sam_2',  label: 'Bodega',                   horaire: '17h30 – 20h', besoin:  6 },
+        { id: 'sam_3',  label: 'Caisse',                   horaire: '17h30 – 20h', besoin:  1 },
+        { id: 'sam_4',  label: 'Réassort',                 horaire: '17h30 – 20h', besoin:  1 },
+        { id: 'sam_5',  label: 'Bodega',                   horaire: '20h – 22h',   besoin:  6 },
+        { id: 'sam_6',  label: 'Caisse',                   horaire: '20h – 22h',   besoin:  1 },
+        { id: 'sam_7',  label: 'Réassort',                 horaire: '20h – 22h',   besoin:  1 },
+        { id: 'sam_8',  label: 'Bodega',                   horaire: '22h – 00h',   besoin:  8 },
+        { id: 'sam_9',  label: 'Caisse',                   horaire: '22h – 00h',   besoin:  1 },
+        { id: 'sam_10', label: 'Réassort',                 horaire: '22h – 00h',   besoin:  1 },
+        { id: 'sam_11', label: 'Bodega',                   horaire: '00h – 02h',   besoin:  8 },
+        { id: 'sam_12', label: 'Caisse',                   horaire: '00h – 02h',   besoin:  1 },
+        { id: 'sam_13', label: 'Réassort',                 horaire: '00h – 02h',   besoin:  1 },
+        { id: 'sam_14', label: 'Bodega',                   horaire: '02h – 04h30', besoin:  6 },
+        { id: 'sam_15', label: 'Caisse',                   horaire: '02h – 04h30', besoin:  1 },
+        { id: 'sam_16', label: 'Réassort',                 horaire: '02h – 04h30', besoin:  1 },
+        { id: 'sam_17', label: 'Point repos',              horaire: '01h30 – 06h', besoin:  5 },
+      ]},
+      { id: 'dim', label: 'Dimanche 2 août', creneaux: [
+        { id: 'dim_1',  label: 'Défilé',                   horaire: '11h – 14h',  besoin:  6 },
+        { id: 'dim_2',  label: 'Préparation restauration', horaire: '11h – 13h',  besoin:  2 },
+        { id: 'dim_3',  label: 'Bodega',                   horaire: '11h – 13h',  besoin: 10 },
+        { id: 'dim_4',  label: 'Caisse',                   horaire: '11h – 13h',  besoin:  1 },
+        { id: 'dim_5',  label: 'Réassort',                 horaire: '11h – 13h',  besoin:  1 },
+        { id: 'dim_6',  label: 'Bodega',                   horaire: '13h – 15h',  besoin: 10 },
+        { id: 'dim_7',  label: 'Caisse',                   horaire: '13h – 15h',  besoin:  1 },
+        { id: 'dim_8',  label: 'Réassort',                 horaire: '13h – 15h',  besoin:  1 },
+        { id: 'dim_9',  label: 'Bodega',                   horaire: '15h – 17h',  besoin: 10 },
+        { id: 'dim_10', label: 'Caisse',                   horaire: '15h – 17h',  besoin:  1 },
+        { id: 'dim_11', label: 'Réassort',                 horaire: '15h – 17h',  besoin:  1 },
+        { id: 'dim_12', label: 'Bodega',                   horaire: '17h – 19h',  besoin: 10 },
+        { id: 'dim_13', label: 'Caisse',                   horaire: '17h – 19h',  besoin:  1 },
+        { id: 'dim_14', label: 'Réassort',                 horaire: '17h – 19h',  besoin:  1 },
+      ]},
+      { id: 'lun', label: 'Lundi 3 août', sublabel: 'Rangement', creneaux: [
+        { id: 'lun_1', label: 'Rangement', horaire: '9h – 12h', besoin: 12 },
+      ]},
+    ],
+    inscriptions: [
+      { nom: 'Marie Dupont', creneauId: 'mer_1' },
+      { nom: 'Jean Martin',  creneauId: 'mer_1' },
+      { nom: 'Sophie B.',    creneauId: 'mer_1' },
+      { nom: 'Pierre R.',    creneauId: 'mer_2' },
+      { nom: 'Lucie T.',     creneauId: 'mer_2' },
+      { nom: 'Marie Dupont', creneauId: 'mer_2' },
+      { nom: 'Marc D.',      creneauId: 'jeu_1' },
+      { nom: 'Alice F.',     creneauId: 'jeu_4' },
+    ]
+  };
+// ── Accès à l'API Google via JSONP (contourne tout problème de CORS) ──
+// On insère une balise <script> vers l'URL /exec ; le serveur répond en
+// appelant la fonction « callback » qu'on lui passe. Aucun appel direct
+// du visiteur à script.google.com en navigation → plus d'erreur Drive.
+var _jsonpSeq = 0;
+function callApi(action, params) {
+  if (!API_URL) return mockApi(action, params); // mode démo local
+  return new Promise(function (resolve, reject) {
+    var cb = '_fdtcb_' + (++_jsonpSeq) + '_' + Date.now();
+    var script = document.createElement('script');
+    var timer = setTimeout(function () { cleanup(); reject(new Error('timeout')); }, 20000);
+    function cleanup() {
+      clearTimeout(timer);
+      try { delete window[cb]; } catch (e) { window[cb] = undefined; }
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+    window[cb] = function (data) { cleanup(); resolve(data); };
+    var qs = '?action=' + encodeURIComponent(action) + '&callback=' + cb;
+    params = params || {};
+    Object.keys(params).forEach(function (k) {
+      qs += '&' + k + '=' + encodeURIComponent(params[k]);
+    });
+    script.src = API_URL + qs;
+    script.onerror = function () { cleanup(); reject(new Error('network')); };
+    document.head.appendChild(script);
+  });
+}
+
+// Implémentation de démonstration (quand API_URL est vide).
+function mockApi(action, params) {
+  params = params || {};
+  return new Promise(function (resolve) {
+    setTimeout(function () {
+      if (action === 'inscrire') {
+        MOCK_DATA.inscriptions.push({ nom: params.nom, creneauId: params.creneauId });
+        resolve({ success: true });
+      } else if (action === 'desinscrire') {
+        MOCK_DATA.inscriptions = MOCK_DATA.inscriptions.filter(function (x) {
+          return !(x.nom === params.nom && x.creneauId === params.creneauId);
+        });
+        resolve({ success: true });
+      } else { // getData / rafraichir
+        resolve(JSON.parse(JSON.stringify(MOCK_DATA)));
+      }
+    }, 200);
+  });
+}
+</script>
+<script>
+(function () {
+  'use strict';
+
+  // ── State ──────────────────────────────────────────────────
+  var state = { data: null, dayId: null, busy: false };
+  var NOM_KEY = 'fdt_benevole_nom';
+  var REFRESH_MS = 60000;
+
+  // ── Boot ──────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function () {
+    var nomEl = document.getElementById('nom');
+
+    nomEl.value = localStorage.getItem(NOM_KEY) || '';
+    nomEl.addEventListener('input', function () {
+      localStorage.setItem(NOM_KEY, this.value.trim());
+      renderDay();
+    });
+
+    syncTabsTop();
+    window.addEventListener('resize', syncTabsTop);
+
+    document.getElementById('btnRefresh').addEventListener('click', doRafraichir);
+
+    loadData();
+    setInterval(loadData, REFRESH_MS);
+  });
+
+  // ── Rafraîchir créneaux (régénère la vue + recharge les données) ──
+  function doRafraichir() {
+    var btn = document.getElementById('btnRefresh');
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.classList.add('spinning');
+    callApi('rafraichir')
+      .then(function (data) {
+        btn.disabled = false;
+        btn.classList.remove('spinning');
+        onData(data);
+        toast('Créneaux à jour', 'ok');
+      })
+      .catch(function () {
+        btn.disabled = false;
+        btn.classList.remove('spinning');
+        toast('Erreur de connexion', 'err');
+      });
+  }
+
+  function syncTabsTop() {
+    document.getElementById('tabsWrap').style.top =
+      document.getElementById('hdr').offsetHeight + 'px';
+  }
+
+  // ── Data loading ──────────────────────────────────────────
+  function loadData() {
+    callApi('getData').then(onData).catch(onError);
+  }
+
+  function onData(data) {
+    var firstLoad = !state.data;
+    state.data = data;
+
+    if (firstLoad) {
+      buildTabs();
+      state.dayId = state.data.jours[0].id;
+    }
+    renderDay();
+  }
+
+  function onError() {
+    // Au premier chargement on affiche l'erreur ; ensuite (échec ponctuel
+    // d'actualisation auto) on garde l'affichage courant pour ne pas le vider.
+    if (!state.data) {
+      document.getElementById('main').innerHTML =
+        '<div class="loader" style="color:var(--red)">Erreur de connexion.<br>Rechargez la page.</div>';
+    }
+  }
+
+  // ── Tabs ──────────────────────────────────────────────────
+  function buildTabs() {
+    var container = document.getElementById('tabs');
+    container.innerHTML = '';
+    state.data.jours.forEach(function (j) {
+      var t = document.createElement('button');
+      t.className = 'tab';
+      t.textContent = j.label.split(' ').slice(0, 2).join(' '); // "Mercredi 29"
+      t.setAttribute('data-id', j.id);
+      t.addEventListener('click', function () {
+        state.dayId = j.id;
+        document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('active'); });
+        t.classList.add('active');
+        renderDay();
+        window.scrollTo(0, 0); // afficher le jour depuis le haut
+        // Centrer l'onglet horizontalement, sans défilement vertical
+        t.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' });
+      });
+      container.appendChild(t);
+    });
+    // Activate first tab
+    container.querySelector('.tab').classList.add('active');
+  }
+
+  // ── Render day ────────────────────────────────────────────
+  function renderDay() {
+    if (!state.data) return;
+
+    var jour = state.data.jours.find(function (j) { return j.id === state.dayId; });
+    if (!jour) return;
+
+    var nom = document.getElementById('nom').value.trim();
+
+    // Index inscriptions by creneauId
+    var byId = {};
+    state.data.inscriptions.forEach(function (ins) {
+      (byId[ins.creneauId] || (byId[ins.creneauId] = [])).push(ins.nom);
+    });
+
+    // Group créneaux by horaire, preserving order of first appearance
+    var groups = [], groupIndex = {};
+    jour.creneaux.forEach(function (cr) {
+      if (groupIndex[cr.horaire] === undefined) {
+        groupIndex[cr.horaire] = groups.length;
+        groups.push({ horaire: cr.horaire, creneaux: [] });
+      }
+      groups[groupIndex[cr.horaire]].creneaux.push(cr);
+    });
+
+    var parts = [];
+    parts.push('<div class="day-hdr">');
+    parts.push('<div class="day-title">' + esc(jour.label) + '</div>');
+    if (jour.sublabel) parts.push('<div class="day-sub">' + esc(jour.sublabel) + '</div>');
+    parts.push('</div>');
+
+    groups.forEach(function (g) {
+      // Lignes séparées : autres (ex. Préparation restauration) ; Bodega ; Caisse + Réassort
+      var bodega = g.creneaux.filter(function (cr) { return cr.label === 'Bodega'; });
+      var caisseReassort = g.creneaux.filter(function (cr) {
+        return cr.label === 'Caisse' || cr.label === 'Réassort';
+      });
+      var autres = g.creneaux.filter(function (cr) {
+        return cr.label !== 'Bodega' && cr.label !== 'Caisse' && cr.label !== 'Réassort';
+      });
+
+      parts.push('<div class="timeblock">');
+      parts.push('<div class="timeblock-head">' + esc(g.horaire) + '</div>');
+      [autres, bodega, caisseReassort].forEach(function (row) {
+        if (!row.length) return;
+        parts.push('<div class="timeblock-row">');
+        row.forEach(function (cr) {
+          parts.push(renderCard(cr, byId[cr.id] || [], nom));
+        });
+        parts.push('</div>');
+      });
+      parts.push('</div>');
+    });
+
+    parts.push('<p class="refresh-bar">Actualisation auto toutes les minutes</p>');
+
+    document.getElementById('main').innerHTML = parts.join('');
+  }
+
+  // Render one slot card (horaire is shown by the parent time-block)
+  function renderCard(cr, inscrits, nom) {
+    var n    = inscrits.length;
+    var pct  = Math.min(100, Math.round(n / cr.besoin * 100));
+    var full = n >= cr.besoin;
+    var mine = nom && inscrits.some(function (x) {
+      return x.toLowerCase() === nom.toLowerCase();
+    });
+
+    var barColor = full ? '#27ae60' : pct >= 60 ? '#e67e22' : '#e74c3c';
+    var cls = 'card' + (full ? ' full' : '') + (mine ? ' mine' : '');
+
+    var p = [];
+    p.push('<div class="' + cls + '">');
+
+    p.push('<div class="card-top"><div class="card-name">' + esc(cr.label) + '</div></div>');
+
+    p.push('<div class="prog">');
+    p.push('<div class="prog-bar-bg"><div class="prog-bar-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div>');
+    p.push('<div class="prog-text"><strong>' + n + ' / ' + cr.besoin + '</strong> bénévole' + (cr.besoin > 1 ? 's' : '') + '</div>');
+    p.push('</div>');
+
+    p.push('<div class="chips">');
+    if (inscrits.length === 0) {
+      p.push('<span class="no-one">Personne encore</span>');
+    } else {
+      inscrits.forEach(function (n2) {
+        var isMe = nom && n2.toLowerCase() === nom.toLowerCase();
+        p.push('<span class="chip' + (isMe ? ' mine' : '') + '">' + esc(n2) + '</span>');
+      });
+    }
+    p.push('</div>');
+
+    if (mine) {
+      p.push('<button class="btn btn-leave" data-action="leave" data-id="' + cr.id + '">Me désinscrire</button>');
+    } else {
+      var dis = nom ? '' : ' disabled title="Entrez votre prénom d\'abord"';
+      p.push('<button class="btn btn-join"' + dis + ' data-action="join" data-id="' + cr.id + '">Je m\'inscris</button>');
+    }
+
+    p.push('</div>'); // .card
+    return p.join('');
+  }
+
+  // ── Event delegation ──────────────────────────────────────
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn || btn.disabled || state.busy) return;
+
+    var action = btn.dataset.action;
+    var id     = btn.dataset.id;
+
+    if (action === 'join')  doInscrire(id);
+    if (action === 'leave') doDesinscrire(id);
+  });
+
+  // ── Actions ───────────────────────────────────────────────
+  function doInscrire(creneauId) {
+    var nom = document.getElementById('nom').value.trim();
+    if (!nom) {
+      toast('Entrez votre prénom d\'abord', 'err');
+      document.getElementById('nom').focus();
+      return;
+    }
+    setBusy(true);
+    callApi('inscrire', { nom: nom, creneauId: creneauId })
+      .then(function (res) {
+        setBusy(false);
+        if (res && res.success) {
+          state.data.inscriptions.push({ nom: nom, creneauId: creneauId });
+          renderDay();
+          toast('Inscription enregistrée !', 'ok');
+        } else {
+          toast((res && res.error) || 'Erreur lors de l\'inscription', 'err');
+        }
+      })
+      .catch(function () {
+        setBusy(false);
+        toast('Erreur de connexion', 'err');
+      });
+  }
+
+  function doDesinscrire(creneauId) {
+    var nom = document.getElementById('nom').value.trim();
+    if (!nom) return;
+    setBusy(true);
+    callApi('desinscrire', { nom: nom, creneauId: creneauId })
+      .then(function (res) {
+        setBusy(false);
+        if (res && res.success) {
+          var nomLc = nom.toLowerCase();
+          state.data.inscriptions = state.data.inscriptions.filter(function (ins) {
+            return !(ins.nom.toLowerCase() === nomLc && ins.creneauId === creneauId);
+          });
+          renderDay();
+          toast('Désinscription enregistrée', 'ok');
+        } else {
+          toast((res && res.error) || 'Erreur lors de la désinscription', 'err');
+        }
+      })
+      .catch(function () {
+        setBusy(false);
+        toast('Erreur de connexion', 'err');
+      });
+  }
+
+  function setBusy(b) {
+    state.busy = b;
+    document.querySelectorAll('.btn').forEach(function (el) {
+      if (!el.hasAttribute('title')) el.disabled = b;
+    });
+  }
+
+  // ── Toast ─────────────────────────────────────────────────
+  var toastTimer = null;
+  function toast(msg, type) {
+    var el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast' + (type ? ' ' + type : '');
+    void el.offsetWidth; // reflow
+    el.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('on'); }, 3200);
+  }
+
+  // ── Utils ─────────────────────────────────────────────────
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+})();
+</script>
+
+</body>
+</html>

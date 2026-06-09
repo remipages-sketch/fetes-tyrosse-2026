@@ -457,7 +457,11 @@ function callApi(action, params) {
     var timer = setTimeout(function () { cleanup(); reject(new Error('timeout')); }, 20000);
     function cleanup() {
       clearTimeout(timer);
-      try { delete window[cb]; } catch (e) { window[cb] = undefined; }
+      // Remplace par un no-op (au lieu de supprimer) : si la réponse arrive
+      // APRÈS un timeout, elle appelle une fonction inoffensive au lieu de
+      // lever une ReferenceError. On nettoie pour de bon un peu plus tard.
+      window[cb] = function () {};
+      setTimeout(function () { try { delete window[cb]; } catch (e) { window[cb] = undefined; } }, 30000);
       if (script.parentNode) script.parentNode.removeChild(script);
     }
     window[cb] = function (data) { cleanup(); resolve(data); };
@@ -538,7 +542,7 @@ function mockApi(action, params) {
         btn.disabled = false;
         btn.classList.remove('spinning');
         if (estRefuse(data)) { demanderCode(true); return; }
-        onData(data);
+        if (pending === 0) onData(data); // ne pas écraser une écriture optimiste en cours
         toast('Créneaux à jour', 'ok');
       })
       .catch(function () {
@@ -590,6 +594,10 @@ function mockApi(action, params) {
   }
 
   function onData(data) {
+    // Réponse serveur invalide / d'erreur (pas de jours) : ne pas planter,
+    // afficher l'erreur (au 1er chargement) plutôt que rester sur le loader.
+    if (!data || !data.jours) { onError(); return; }
+
     var firstLoad = !state.data;
     state.data = data;
 
@@ -789,8 +797,11 @@ function mockApi(action, params) {
       })
       .catch(function () {
         pending--;
-        retirer(entree); renderDay();
-        toast('Hors ligne : inscription non enregistrée', 'err');
+        // Timeout / réseau : on ignore si le serveur a enregistré ou non.
+        // On NE retire PAS (éviter d'effacer une inscription bel et bien
+        // enregistrée) ; on réconcilie avec l'état réel du serveur.
+        toast('Connexion lente — vérification…', '');
+        loadData();
       });
   }
 
@@ -800,30 +811,39 @@ function mockApi(action, params) {
     var nomLc = nom.toLowerCase();
     if (!estInscrit(creneauId, nomLc)) return;
 
-    // 1) Retrait immédiat de l'affichage (on mémorise pour pouvoir annuler)
-    var sauvegarde = state.data.inscriptions.slice();
+    // 1) Retrait immédiat de l'affichage
     state.data.inscriptions = state.data.inscriptions.filter(function (ins) {
       return !(ins.nom.toLowerCase() === nomLc && ins.creneauId === creneauId);
     });
     renderDay();
+
+    // Annulation ciblée : remet CETTE inscription si le serveur refuse,
+    // sans toucher aux autres changements faits entre-temps.
+    function rollback() {
+      if (!estInscrit(creneauId, nomLc)) {
+        state.data.inscriptions.push({ nom: nom, creneauId: creneauId });
+      }
+      renderDay();
+    }
 
     // 2) Envoi au serveur en arrière-plan
     pending++;
     callApi('desinscrire', { nom: nom, creneauId: creneauId })
       .then(function (res) {
         pending--;
-        if (estRefuse(res)) { state.data.inscriptions = sauvegarde; renderDay(); demanderCode(true); return; }
+        if (estRefuse(res)) { rollback(); demanderCode(true); return; }
         if (!res || !res.success) {
           if (!(res && /trouv/i.test(res.error || ''))) {
-            state.data.inscriptions = sauvegarde; renderDay();
+            rollback();
             toast((res && res.error) || 'Désinscription non enregistrée', 'err');
           }
         }
       })
       .catch(function () {
         pending--;
-        state.data.inscriptions = sauvegarde; renderDay();
-        toast('Hors ligne : désinscription non enregistrée', 'err');
+        // Timeout / réseau : on réconcilie plutôt que de remettre à tort.
+        toast('Connexion lente — vérification…', '');
+        loadData();
       });
   }
 

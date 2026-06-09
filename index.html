@@ -344,6 +344,11 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbx7dTQhtt50jvcdEwUOiIRGvw
 var ACCESS_CODE = '';
 try { ACCESS_CODE = localStorage.getItem('fdt_code') || ''; } catch (e) {}
 
+// Doit refléter l'état CODE_ACCES du serveur (Code.gs). Si true, l'écran de
+// code s'affiche d'emblée tant qu'aucun code n'est mémorisé (évite que la
+// grille « clignote » avant le verrou). Repasser à false si on retire le code.
+var REQUIERT_CODE = true;
+
 // Données de démonstration (utilisées uniquement si API_URL est vide).
 var MOCK_DATA = {
     jours: [
@@ -532,6 +537,10 @@ function mockApi(action, params) {
     // serveur : la page n'est plus vide pendant le chargement. Les noms se
     // remplissent dès que les données arrivent.
     amorcerAffichage();
+
+    // Appli réservée : afficher l'écran de code tout de suite tant qu'aucun
+    // code n'est mémorisé (recouvre la grille, évite le clignotement).
+    if (REQUIERT_CODE && !ACCESS_CODE) demanderCode(false);
 
     // Récupération des inscriptions réelles, légèrement étalée (0–1,2 s) pour
     // ne pas frapper le serveur tous en même temps lors d'un envoi groupé.

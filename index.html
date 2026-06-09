@@ -527,8 +527,21 @@ function mockApi(action, params) {
       if (e.key === 'Enter') validerCode();
     });
 
-    loadData();
-    setInterval(loadData, REFRESH_MS);
+    // Premier chargement ÉTALÉ sur 0–3 s : si 30 personnes ouvrent le lien
+    // en même temps, les requêtes ne frappent plus le serveur dans la même
+    // milliseconde (évite de saturer la limite d'exécutions simultanées GAS).
+    setTimeout(loadData, Math.floor(Math.random() * 3000));
+
+    // Actualisation auto, MISE EN PAUSE quand l'onglet est en arrière-plan
+    // (supprime les appels inutiles → moins de charge et de quota).
+    setInterval(function () {
+      if (!document.hidden) loadData();
+    }, REFRESH_MS);
+
+    // Au retour sur l'onglet, on rafraîchit tout de suite.
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) loadData();
+    });
   });
 
   // ── Rafraîchir créneaux (régénère la vue + recharge les données) ──

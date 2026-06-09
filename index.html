@@ -123,13 +123,23 @@
 
     /* ── Time block (groups slots sharing the same horaire) ── */
     .timeblock { margin-bottom: 16px; }
+    /* Bande pleine largeur, couleur du fond : masque proprement les cartes
+       qui défilent dessous quand l'horaire est épinglé. */
     .timeblock-head {
+      position: sticky;
+      top: var(--stick-top, 0px);   /* reste épinglé sous la barre d'onglets */
+      z-index: 100;                 /* au-dessus des cartes, sous les onglets (190) */
+      background: var(--bg);
+      padding: 4px 0 8px;
+      margin-bottom: 1px;
+    }
+    .timeblock-head span {
       display: inline-block;
       font-size: .98rem; font-weight: 700;
       color: var(--red-dk);
       background: #fdecea;
       padding: 5px 13px; border-radius: 8px;
-      margin-bottom: 9px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.12);
     }
     .timeblock-row {
       display: flex; flex-wrap: wrap; gap: 10px;
@@ -539,8 +549,12 @@ function mockApi(action, params) {
   }
 
   function syncTabsTop() {
-    document.getElementById('tabsWrap').style.top =
-      document.getElementById('hdr').offsetHeight + 'px';
+    var hdrH = document.getElementById('hdr').offsetHeight;
+    var tabsWrap = document.getElementById('tabsWrap');
+    tabsWrap.style.top = hdrH + 'px';
+    // Les pastilles d'horaire (sticky) se collent juste sous la barre d'onglets.
+    var stick = hdrH + tabsWrap.offsetHeight;
+    document.documentElement.style.setProperty('--stick-top', stick + 'px');
   }
 
   // ── Code d'accès ──────────────────────────────────────────
@@ -618,6 +632,7 @@ function mockApi(action, params) {
     });
     // Activate first tab
     container.querySelector('.tab').classList.add('active');
+    syncTabsTop(); // recalcule l'offset sticky une fois les onglets présents
   }
 
   // ── Render day ────────────────────────────────────────────
@@ -662,7 +677,7 @@ function mockApi(action, params) {
       });
 
       parts.push('<div class="timeblock">');
-      parts.push('<div class="timeblock-head">' + esc(g.horaire) + '</div>');
+      parts.push('<div class="timeblock-head"><span>' + esc(g.horaire) + '</span></div>');
       [autres, bodega, caisseReassort].forEach(function (row) {
         if (!row.length) return;
         parts.push('<div class="timeblock-row">');

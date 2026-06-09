@@ -506,6 +506,7 @@ function mockApi(action, params) {
   var NOM_KEY = 'fdt_benevole_nom';
   var REFRESH_MS = 60000;
   var pending = 0; // nb d'écritures en cours (inscrire/désinscrire optimistes)
+  var donneesReelles = false; // true dès que les inscriptions du serveur sont arrivées
 
   // ── Boot ──────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function () {
@@ -527,10 +528,15 @@ function mockApi(action, params) {
       if (e.key === 'Enter') validerCode();
     });
 
-    // Premier chargement ÉTALÉ sur 0–3 s : si 30 personnes ouvrent le lien
-    // en même temps, les requêtes ne frappent plus le serveur dans la même
-    // milliseconde (évite de saturer la limite d'exécutions simultanées GAS).
-    setTimeout(loadData, Math.floor(Math.random() * 3000));
+    // Affichage IMMÉDIAT de la structure (jours + créneaux), sans attendre le
+    // serveur : la page n'est plus vide pendant le chargement. Les noms se
+    // remplissent dès que les données arrivent.
+    amorcerAffichage();
+
+    // Récupération des inscriptions réelles, légèrement étalée (0–1,2 s) pour
+    // ne pas frapper le serveur tous en même temps lors d'un envoi groupé.
+    // L'interface étant déjà visible, ce délai ne se voit pas.
+    setTimeout(loadData, Math.floor(Math.random() * 1200));
 
     // Actualisation auto, MISE EN PAUSE quand l'onglet est en arrière-plan
     // (supprime les appels inutiles → moins de charge et de quota).
@@ -555,7 +561,7 @@ function mockApi(action, params) {
         btn.disabled = false;
         btn.classList.remove('spinning');
         if (estRefuse(data)) { demanderCode(true); return; }
-        if (pending === 0) onData(data); // ne pas écraser une écriture optimiste en cours
+        if (pending === 0) { donneesReelles = true; onData(data); } // ne pas écraser une écriture optimiste en cours
         toast('Créneaux à jour', 'ok');
       })
       .catch(function () {
@@ -597,11 +603,20 @@ function mockApi(action, params) {
     loadData();
   }
 
+  // Affiche tout de suite la structure (jours + créneaux) à partir du modèle
+  // embarqué dans la page, sans attendre le serveur. Les compteurs sont à 0
+  // jusqu'à l'arrivée des vraies inscriptions.
+  function amorcerAffichage() {
+    if (state.data) return;
+    onData({ jours: MOCK_DATA.jours, inscriptions: [] });
+  }
+
   // ── Data loading ──────────────────────────────────────────
   function loadData() {
     callApi('getData').then(function (data) {
       if (estRefuse(data)) { demanderCode(!!ACCESS_CODE); return; }
       if (pending > 0) return; // une écriture optimiste est en cours : ne pas écraser
+      donneesReelles = true;
       onData(data);
     }).catch(onError);
   }
@@ -710,7 +725,9 @@ function mockApi(action, params) {
       parts.push('</div>');
     });
 
-    parts.push('<p class="refresh-bar">Actualisation auto toutes les minutes</p>');
+    parts.push('<p class="refresh-bar">' +
+      (donneesReelles ? 'Actualisation auto toutes les minutes' : 'Chargement des inscriptions…') +
+      '</p>');
 
     document.getElementById('main').innerHTML = parts.join('');
   }
